@@ -72,7 +72,7 @@ func (e *editor) read() (string, error) {
 		key, err := e.reader.ReadByte()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				fmt.Fprintln(e.out)
+				fmt.Fprint(e.out, "\r\n")
 				return "", ErrCancelled
 			}
 			return "", err
@@ -80,10 +80,10 @@ func (e *editor) read() (string, error) {
 		switch key {
 		case '\r', '\n':
 			value := strings.TrimSpace(string(e.buffer))
-			fmt.Fprintln(e.out)
+			fmt.Fprint(e.out, "\r\n")
 			return value, nil
 		case 3, 4: // Ctrl-C or Ctrl-D
-			fmt.Fprintln(e.out)
+			fmt.Fprint(e.out, "\r\n")
 			return "", ErrCancelled
 		case 1: // Ctrl-A
 			e.cursor = 0

@@ -55,7 +55,7 @@ func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
-	value, err := editor.Read(in, out, editor.Config{
+	value, err := editor.Read(in, errOut, editor.Config{
 		Prompt:    "PATH> ",
 		Initial:   initial,
 		History:   store,

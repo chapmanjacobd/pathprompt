@@ -45,7 +45,8 @@ func (e Engine) Complete(input string) []Candidate {
 		if !strings.HasPrefix(name, prefix) || (strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".")) {
 			continue
 		}
-		value := filepath.Join(parent, name)
+		// Keep the parent exactly as the user supplied it, including ./ or .\.
+		value := parent + name
 		if !filepath.IsAbs(expanded) && parent == "." {
 			value = name
 		}

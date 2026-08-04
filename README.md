@@ -1,8 +1,8 @@
 # pathprompt
 
-`pathprompt` is a small Go path selector for scripts and shell integrations. It prints
-the chosen path to stdout, stores history per namespace, and exits with status 130 when
-cancelled.
+`pathprompt` is a small Go path selector for scripts and shell integrations. It writes
+its interactive UI to stderr, prints the chosen path to stdout, stores history per
+namespace, and exits with status 130 when cancelled.
 
 It provides:
 

@@ -45,6 +45,21 @@ func TestCompletePreservesTildeNotation(t *testing.T) {
 	}
 }
 
+func TestCompletePreservesExplicitRelativePrefix(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "alpha"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	input := "." + string(filepath.Separator) + "a"
+	got := New(t.TempDir()).Complete(input)
+	want := "." + string(filepath.Separator) + "alpha" + string(filepath.Separator)
+	if len(got) != 1 || got[0].Value != want {
+		t.Fatalf("Complete(%q) = %#v, want %q", input, got, want)
+	}
+}
+
 func TestCommonPrefix(t *testing.T) {
 	candidates := []Candidate{{Value: "archive/"}, {Value: "artist/"}, {Value: "art.txt"}}
 	if got := CommonPrefix(candidates); got != "ar" {
