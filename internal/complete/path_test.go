@@ -60,6 +60,33 @@ func TestCompletePreservesExplicitRelativePrefix(t *testing.T) {
 	}
 }
 
+func TestCompleteFiltersByType(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "directory"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "file"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name string
+		kind PathType
+		want string
+	}{
+		{name: "file", kind: TypeFile, want: filepath.Join(root, "file")},
+		{name: "directory", kind: TypeDirectory, want: filepath.Join(root, "directory") + string(filepath.Separator)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := root + string(filepath.Separator)
+			got := New(t.TempDir(), test.kind).Complete(input)
+			if len(got) != 1 || got[0].Value != test.want {
+				t.Fatalf("Complete(%q) = %#v, want %q", input, got, test.want)
+			}
+		})
+	}
+}
+
 func TestCommonPrefix(t *testing.T) {
 	candidates := []Candidate{{Value: "archive/"}, {Value: "artist/"}, {Value: "art.txt"}}
 	if got := CommonPrefix(candidates); got != "ar" {

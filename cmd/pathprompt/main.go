@@ -22,10 +22,15 @@ func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
 	flags := flag.NewFlagSet("pathprompt", flag.ContinueOnError)
 	flags.SetOutput(errOut)
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: pathprompt [namespace] [last-destination]")
+		fmt.Fprintln(errOut, "Usage: pathprompt [options] [namespace] [last-destination]")
 		fmt.Fprintln(errOut, "Print one path selected interactively, or q when cancelled.")
 	}
 	showVersion := flags.Bool("version", false, "print version")
+	var typeFlag pathTypeFlag
+	flags.Var(&typeFlag, "type", "complete only files or directories")
+	flags.Var(&typeFlag, "t", "complete only files or directories")
+	filesOnly := flags.Bool("tf", false, "complete files only")
+	directoriesOnly := flags.Bool("td", false, "complete directories only")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -37,6 +42,11 @@ func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
 	positional := flags.Args()
 	if len(positional) > 2 {
 		flags.Usage()
+		return 2
+	}
+	pathType, err := resolvePathType(typeFlag, *filesOnly, *directoriesOnly)
+	if err != nil {
+		fmt.Fprintf(errOut, "pathprompt: %v\n", err)
 		return 2
 	}
 
@@ -59,7 +69,7 @@ func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
 		Prompt:    "PATH> ",
 		Initial:   initial,
 		History:   store,
-		Completer: complete.New(os.Getenv("HOME")),
+		Completer: complete.New(os.Getenv("HOME"), pathType),
 	})
 	if errors.Is(err, editor.ErrCancelled) {
 		return 130
@@ -75,4 +85,43 @@ func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
 	}
 	fmt.Fprintln(out, value)
 	return 0
+}
+
+type pathTypeFlag struct {
+	value complete.PathType
+	set   bool
+}
+
+func (f *pathTypeFlag) String() string {
+	return string(f.value)
+}
+
+func (f *pathTypeFlag) Set(value string) error {
+	pathType, err := complete.ParseType(value)
+	if err != nil {
+		return err
+	}
+	f.value = pathType
+	f.set = true
+	return nil
+}
+
+func resolvePathType(typeFlag pathTypeFlag, filesOnly, directoriesOnly bool) (complete.PathType, error) {
+	var selected complete.PathType
+	if filesOnly {
+		selected = complete.TypeFile
+	}
+	if directoriesOnly {
+		if selected != "" {
+			return complete.TypeAny, errors.New("cannot combine -tf and -td")
+		}
+		selected = complete.TypeDirectory
+	}
+	if typeFlag.set {
+		if selected != "" && selected != typeFlag.value {
+			return complete.TypeAny, errors.New("cannot combine --type with a different -tf or -td filter")
+		}
+		selected = typeFlag.value
+	}
+	return selected, nil
 }

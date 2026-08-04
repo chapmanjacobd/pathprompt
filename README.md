@@ -26,13 +26,17 @@ go build ./cmd/pathprompt
 ## Usage
 
 ```sh
-pathprompt [namespace] [last-destination]
+pathprompt [options] [namespace] [last-destination]
 ```
 
 `namespace` defaults to `default`, allowing different callers to keep independent
 history. `last-destination` pre-populates the editor. History is written to
 `$XDG_STATE_HOME/pathprompt/<namespace>.history`, or
 `~/.local/state/pathprompt/<namespace>.history` when `XDG_STATE_HOME` is unset.
+
+Use `-tf` or `--type file` to complete files only, and `-td` or `--type directory`
+to complete directories only. The `-t` form is also accepted with `file` or
+`directory`.
 
 While editing, Tab completes paths; a second Tab lists ambiguous candidates. Up and Down
 navigate history entries matching the initial text. The dim suffix is the newest matching

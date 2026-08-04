@@ -2,6 +2,7 @@
 package complete
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,16 +16,42 @@ type Candidate struct {
 	IsDir bool
 }
 
-// Engine completes user-supplied filesystem path prefixes and expands leading ~.
-type Engine struct {
-	home string
+// PathType limits completion candidates by filesystem entry type.
+type PathType string
+
+const (
+	TypeAny       PathType = ""
+	TypeFile      PathType = "file"
+	TypeDirectory PathType = "directory"
+)
+
+// ParseType accepts fd-style type names and their short forms.
+func ParseType(value string) (PathType, error) {
+	switch strings.ToLower(value) {
+	case "f", "file":
+		return TypeFile, nil
+	case "d", "dir", "directory":
+		return TypeDirectory, nil
+	default:
+		return TypeAny, fmt.Errorf("unsupported path type %q (want file or directory)", value)
+	}
 }
 
-func New(home string) Engine {
+// Engine completes user-supplied filesystem path prefixes and expands leading ~.
+type Engine struct {
+	home     string
+	pathType PathType
+}
+
+func New(home string, pathTypes ...PathType) Engine {
 	if home == "" {
 		home, _ = os.UserHomeDir()
 	}
-	return Engine{home: filepath.Clean(home)}
+	pathType := TypeAny
+	if len(pathTypes) > 0 {
+		pathType = pathTypes[0]
+	}
+	return Engine{home: filepath.Clean(home), pathType: pathType}
 }
 
 // Complete returns matching paths in stable directory-first order.
@@ -42,7 +69,7 @@ func (e Engine) Complete(input string) []Candidate {
 	candidates := make([]Candidate, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) || (strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".")) {
+		if !e.matchesType(entry) || !strings.HasPrefix(name, prefix) || (strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".")) {
 			continue
 		}
 		// Keep the parent exactly as the user supplied it, including ./ or .\.
@@ -64,6 +91,19 @@ func (e Engine) Complete(input string) []Candidate {
 		return candidates[i].Value < candidates[j].Value
 	})
 	return candidates
+}
+
+func (e Engine) matchesType(entry os.DirEntry) bool {
+	switch e.pathType {
+	case TypeAny:
+		return true
+	case TypeFile:
+		return entry.Type().IsRegular()
+	case TypeDirectory:
+		return entry.IsDir()
+	default:
+		return false
+	}
 }
 
 func (e Engine) expandHome(input string) string {
