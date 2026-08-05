@@ -55,7 +55,7 @@ func safeNamespace(namespace string) string {
 // Open loads a store. A missing history file creates an empty store.
 func Open(path string, limit int) (*Store, error) {
 	if limit < 1 {
-		return nil, fmt.Errorf("history limit must be positive")
+		return nil, errors.New("history limit must be positive")
 	}
 
 	store := &Store{path: path, limit: limit}
@@ -80,7 +80,7 @@ func Open(path string, limit int) (*Store, error) {
 		if strings.TrimSpace(entry.Value) == "" {
 			continue
 		}
-		store.add(entry)
+		store.appendEntry(entry)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
@@ -94,11 +94,11 @@ func (s *Store) Add(value string) error {
 	if value == "" {
 		return nil
 	}
-	s.add(Entry{Value: value, Used: time.Now().UTC()})
+	s.appendEntry(Entry{Value: value, Used: time.Now().UTC()})
 	return s.save()
 }
 
-func (s *Store) add(entry Entry) {
+func (s *Store) appendEntry(entry Entry) {
 	for i := len(s.entries) - 1; i >= 0; i-- {
 		if s.entries[i].Value == entry.Value {
 			s.entries = append(s.entries[:i], s.entries[i+1:]...)

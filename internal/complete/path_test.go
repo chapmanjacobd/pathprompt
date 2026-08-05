@@ -1,10 +1,12 @@
-package complete
+package complete_test
 
 import (
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/chapmanjacobd/pathprompt/internal/complete"
 )
 
 func TestCompleteOrdersDirectoriesAndHidesDotfiles(t *testing.T) {
@@ -18,7 +20,7 @@ func TestCompleteOrdersDirectoriesAndHidesDotfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	engine := New(t.TempDir())
+	engine := complete.New(t.TempDir())
 	candidates := engine.Complete(filepath.Join(root, "a"))
 	got := make([]string, len(candidates))
 	for i, candidate := range candidates {
@@ -39,7 +41,7 @@ func TestCompletePreservesTildeNotation(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(home, "Documents"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	got := New(home).Complete("~/Do")
+	got := complete.New(home).Complete("~/Do")
 	if len(got) != 1 || got[0].Value != "~/Documents/" {
 		t.Fatalf("Complete() = %#v, want ~/Documents/", got)
 	}
@@ -53,7 +55,7 @@ func TestCompletePreservesExplicitRelativePrefix(t *testing.T) {
 	t.Chdir(root)
 
 	input := "." + string(filepath.Separator) + "a"
-	got := New(t.TempDir()).Complete(input)
+	got := complete.New(t.TempDir()).Complete(input)
 	want := "." + string(filepath.Separator) + "alpha" + string(filepath.Separator)
 	if len(got) != 1 || got[0].Value != want {
 		t.Fatalf("Complete(%q) = %#v, want %q", input, got, want)
@@ -71,15 +73,15 @@ func TestCompleteFiltersByType(t *testing.T) {
 
 	for _, test := range []struct {
 		name string
-		kind PathType
+		kind complete.PathType
 		want string
 	}{
-		{name: "file", kind: TypeFile, want: filepath.Join(root, "file")},
-		{name: "directory", kind: TypeDirectory, want: filepath.Join(root, "directory") + string(filepath.Separator)},
+		{name: "file", kind: complete.TypeFile, want: filepath.Join(root, "file")},
+		{name: "directory", kind: complete.TypeDirectory, want: filepath.Join(root, "directory") + string(filepath.Separator)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := root + string(filepath.Separator)
-			got := New(t.TempDir(), test.kind).Complete(input)
+			got := complete.New(t.TempDir(), test.kind).Complete(input)
 			if len(got) != 1 || got[0].Value != test.want {
 				t.Fatalf("Complete(%q) = %#v, want %q", input, got, test.want)
 			}
@@ -88,8 +90,8 @@ func TestCompleteFiltersByType(t *testing.T) {
 }
 
 func TestCommonPrefix(t *testing.T) {
-	candidates := []Candidate{{Value: "archive/"}, {Value: "artist/"}, {Value: "art.txt"}}
-	if got := CommonPrefix(candidates); got != "ar" {
+	candidates := []complete.Candidate{{Value: "archive/"}, {Value: "artist/"}, {Value: "art.txt"}}
+	if got := complete.CommonPrefix(candidates); got != "ar" {
 		t.Fatalf("CommonPrefix() = %q, want ar", got)
 	}
 }

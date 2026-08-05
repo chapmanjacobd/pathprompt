@@ -1,21 +1,19 @@
-package editor
+package editor_test
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/chapmanjacobd/pathprompt/internal/editor"
 )
 
 func TestReadEndsAcceptedInputAtStartOfLine(t *testing.T) {
 	var out bytes.Buffer
-	e := editor{
-		reader: bufio.NewReader(strings.NewReader("\r")),
-		out:    &out,
-	}
+	e := editor.New(strings.NewReader("\r"), &out, editor.Config{})
 
-	value, err := e.read()
+	value, err := e.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,13 +27,10 @@ func TestReadEndsAcceptedInputAtStartOfLine(t *testing.T) {
 
 func TestReadEndsCancelledInputAtStartOfLine(t *testing.T) {
 	var out bytes.Buffer
-	e := editor{
-		reader: bufio.NewReader(strings.NewReader(string(rune(3)))),
-		out:    &out,
-	}
+	e := editor.New(strings.NewReader(string(rune(3))), &out, editor.Config{})
 
-	_, err := e.read()
-	if !errors.Is(err, ErrCancelled) {
+	_, err := e.Read()
+	if !errors.Is(err, editor.ErrCancelled) {
 		t.Fatalf("read error = %v, want ErrCancelled", err)
 	}
 	if got := out.String(); got != "\r\n" {

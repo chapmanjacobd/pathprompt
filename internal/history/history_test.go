@@ -1,24 +1,26 @@
-package history
+package history_test
 
 import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/chapmanjacobd/pathprompt/internal/history"
 )
 
 func TestStorePersistsDeduplicatedEntries(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "history")
-	store, err := Open(path, 3)
+	store, err := history.Open(path, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, value := range []string{"/one", "/two", "/one", "/three", "/four"} {
-		if err := store.Add(value); err != nil {
-			t.Fatal(err)
+		if addErr := store.Add(value); addErr != nil {
+			t.Fatal(addErr)
 		}
 	}
 
-	loaded, err := Open(path, 3)
+	loaded, err := history.Open(path, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +35,7 @@ func TestStorePersistsDeduplicatedEntries(t *testing.T) {
 
 func TestFilePathUsesSafeNamespace(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "/state")
-	got := FilePath("../work")
+	got := history.FilePath("../work")
 	want := filepath.Join("/state", "pathprompt", "work.history")
 	if got != want {
 		t.Fatalf("FilePath() = %q, want %q", got, want)

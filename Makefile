@@ -1,14 +1,25 @@
-GO ?= go
 BINARY := pathprompt
 CMD := ./cmd/pathprompt
 
 .PHONY: build test install
 
+all: fmt lint build test install
+
 build:
-	$(GO) build -o $(BINARY) $(CMD)
+	go build -o $(BINARY) $(CMD)
 
 test:
-	$(GO) test ./...
+	go test ./...
 
 install:
-	$(GO) install $(CMD)
+	go install $(CMD)
+
+fmt:
+	gofmt -s -w -e .
+	-goimports -w -e .
+	-gofumpt -w .
+	-gci write .
+	go fix ./...
+
+lint:
+	golangci-lint run --fix ./...

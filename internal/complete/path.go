@@ -69,7 +69,9 @@ func (e Engine) Complete(input string) []Candidate {
 	candidates := make([]Candidate, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.Name()
-		if !e.matchesType(entry) || !strings.HasPrefix(name, prefix) || (strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".")) {
+		if !e.matchesType(entry) || !strings.HasPrefix(name, prefix) ||
+			(strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".")) {
+
 			continue
 		}
 		// Keep the parent exactly as the user supplied it, including ./ or .\.

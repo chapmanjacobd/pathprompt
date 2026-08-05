@@ -11,9 +11,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/term"
+
 	"github.com/chapmanjacobd/pathprompt/internal/complete"
 	"github.com/chapmanjacobd/pathprompt/internal/history"
-	"golang.org/x/term"
 )
 
 var ErrCancelled = errors.New("prompt cancelled")
@@ -27,7 +28,7 @@ type Config struct {
 }
 
 // Read presents a path prompt and returns the accepted text.
-func Read(in *os.File, out io.Writer, config Config) (string, error) {
+func Read(in *os.File, out io.Writer, config Config) (value string, readErr error) {
 	if !term.IsTerminal(int(in.Fd())) {
 		return "", errors.New("standard input is not a terminal")
 	}
@@ -35,22 +36,20 @@ func Read(in *os.File, out io.Writer, config Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer term.Restore(int(in.Fd()), state)
+	defer func() {
+		if restoreErr := term.Restore(int(in.Fd()), state); restoreErr != nil && readErr == nil {
+			value = ""
+			readErr = fmt.Errorf("restore terminal: %w", restoreErr)
+		}
+	}()
 
-	e := &editor{
-		reader:    bufio.NewReader(in),
-		out:       out,
-		prompt:    config.Prompt,
-		history:   config.History,
-		completer: config.Completer,
-		buffer:    []rune(config.Initial),
-		cursor:    len([]rune(config.Initial)),
-	}
+	e := New(in, out, config)
 	e.render()
-	return e.read()
+	return e.Read()
 }
 
-type editor struct {
+// Editor reads and edits a single line from a byte stream.
+type Editor struct {
 	reader    *bufio.Reader
 	out       io.Writer
 	prompt    string
@@ -67,7 +66,22 @@ type editor struct {
 	searchIndex  int
 }
 
-func (e *editor) read() (string, error) {
+// New creates an editor for reader and out.
+func New(reader io.Reader, out io.Writer, config Config) *Editor {
+	initial := []rune(config.Initial)
+	return &Editor{
+		reader:    bufio.NewReader(reader),
+		out:       out,
+		prompt:    config.Prompt,
+		history:   config.History,
+		completer: config.Completer,
+		buffer:    initial,
+		cursor:    len(initial),
+	}
+}
+
+// Read reads until the line is accepted or cancelled.
+func (e *Editor) Read() (string, error) {
 	for {
 		key, err := e.reader.ReadByte()
 		if err != nil {
@@ -133,7 +147,7 @@ func (e *editor) read() (string, error) {
 	}
 }
 
-func (e *editor) escape() {
+func (e *Editor) escape() {
 	next, err := e.reader.ReadByte()
 	if err != nil || next != '[' {
 		return
@@ -178,7 +192,7 @@ func (e *editor) escape() {
 	}
 }
 
-func (e *editor) insert(value rune) {
+func (e *Editor) insert(value rune) {
 	e.buffer = append(e.buffer, 0)
 	copy(e.buffer[e.cursor+1:], e.buffer[e.cursor:])
 	e.buffer[e.cursor] = value
@@ -186,7 +200,7 @@ func (e *editor) insert(value rune) {
 	e.resetNavigation()
 }
 
-func (e *editor) deleteWordBackward() {
+func (e *Editor) deleteWordBackward() {
 	start := e.cursor
 	for start > 0 && unicode.IsSpace(e.buffer[start-1]) {
 		start--
@@ -198,7 +212,7 @@ func (e *editor) deleteWordBackward() {
 	e.cursor = start
 }
 
-func (e *editor) previousHistory() {
+func (e *Editor) previousHistory() {
 	if e.history == nil {
 		return
 	}
@@ -213,7 +227,7 @@ func (e *editor) previousHistory() {
 	e.historyIndex++
 }
 
-func (e *editor) nextHistory() {
+func (e *Editor) nextHistory() {
 	if len(e.historyItems) == 0 || e.historyIndex == 0 {
 		return
 	}
@@ -225,7 +239,7 @@ func (e *editor) nextHistory() {
 	e.setBuffer(e.historyItems[e.historyIndex-1])
 }
 
-func (e *editor) reverseSearch() {
+func (e *Editor) reverseSearch() {
 	if e.history == nil {
 		return
 	}
@@ -241,7 +255,7 @@ func (e *editor) reverseSearch() {
 	e.searchIndex = (e.searchIndex + 1) % len(e.searchItems)
 }
 
-func (e *editor) complete() {
+func (e *Editor) complete() {
 	input := string(e.buffer)
 	candidates := e.completer.Complete(input)
 	if len(candidates) == 0 {
@@ -270,26 +284,26 @@ func (e *editor) complete() {
 	fmt.Fprint(e.out, "\r\n")
 }
 
-func (e *editor) setBuffer(value string) {
+func (e *Editor) setBuffer(value string) {
 	e.buffer = []rune(value)
 	e.cursor = len(e.buffer)
 }
 
-func (e *editor) resetNavigation() {
+func (e *Editor) resetNavigation() {
 	e.historyItems = nil
 	e.historyIndex = 0
 	e.searchItems = nil
 	e.searchIndex = 0
 }
 
-func (e *editor) suggestion() string {
+func (e *Editor) suggestion() string {
 	if e.history == nil || e.cursor != len(e.buffer) {
 		return ""
 	}
 	return e.history.Suggest(string(e.buffer))
 }
 
-func (e *editor) render() {
+func (e *Editor) render() {
 	value := string(e.buffer)
 	suggestion := e.suggestion()
 	fmt.Fprint(e.out, "\r\033[2K", display(e.prompt), display(value))

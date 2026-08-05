@@ -18,7 +18,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-func run(args []string, in *os.File, out io.Writer, errOut io.Writer) int {
+func run(args []string, in *os.File, out, errOut io.Writer) int {
 	flags := flag.NewFlagSet("pathprompt", flag.ContinueOnError)
 	flags.SetOutput(errOut)
 	flags.Usage = func() {
