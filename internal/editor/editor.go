@@ -117,7 +117,10 @@ func (e *Editor) Read() (string, error) {
 		case 23: // Ctrl-W
 			e.deleteWordBackward()
 			e.resetNavigation()
-		case 8, 127:
+		case 8: // Ctrl-Backspace
+			e.deleteBoundaryBackward()
+			e.resetNavigation()
+		case 127:
 			if e.cursor > 0 {
 				e.buffer = append(e.buffer[:e.cursor-1], e.buffer[e.cursor:]...)
 				e.cursor--
@@ -149,46 +152,89 @@ func (e *Editor) Read() (string, error) {
 
 func (e *Editor) escape() {
 	next, err := e.reader.ReadByte()
-	if err != nil || next != '[' {
-		return
-	}
-	key, err := e.reader.ReadByte()
 	if err != nil {
 		return
 	}
-	switch key {
-	case 'A':
-		e.previousHistory()
-	case 'B':
-		e.nextHistory()
-	case 'C':
-		if suggestion := e.suggestion(); e.cursor == len(e.buffer) && suggestion != "" {
-			e.buffer = []rune(suggestion)
-			e.cursor = len(e.buffer)
-		} else if e.cursor < len(e.buffer) {
-			e.cursor++
+	if next == 8 || next == 127 {
+		e.clearLine()
+		return
+	}
+	if next != '[' {
+		return
+	}
+	params := make([]byte, 0, 8)
+	for {
+		key, readErr := e.reader.ReadByte()
+		if readErr != nil {
+			return
 		}
-	case 'D':
-		if e.cursor > 0 {
-			e.cursor--
+		if key >= 0x40 && key <= 0x7e {
+			e.handleCSI(string(params), key)
+			return
 		}
-	case 'H':
-		e.cursor = 0
-	case 'F':
-		e.cursor = len(e.buffer)
-	case '3':
-		if terminator, _ := e.reader.ReadByte(); terminator == '~' && e.cursor < len(e.buffer) {
-			e.buffer = append(e.buffer[:e.cursor], e.buffer[e.cursor+1:]...)
-			e.resetNavigation()
+		params = append(params, key)
+		if len(params) == 16 {
+			return
 		}
-	case '1', '4':
-		if terminator, _ := e.reader.ReadByte(); terminator == '~' {
-			if key == '1' {
-				e.cursor = 0
-			} else {
+	}
+}
+
+func (e *Editor) handleCSI(params string, key byte) {
+	if params == "" {
+		switch key {
+		case 'A':
+			e.previousHistory()
+		case 'B':
+			e.nextHistory()
+		case 'C':
+			if suggestion := e.suggestion(); e.cursor == len(e.buffer) && suggestion != "" {
+				e.buffer = []rune(suggestion)
 				e.cursor = len(e.buffer)
+			} else if e.cursor < len(e.buffer) {
+				e.cursor++
 			}
+		case 'D':
+			if e.cursor > 0 {
+				e.cursor--
+			}
+		case 'H':
+			e.cursor = 0
+		case 'F':
+			e.cursor = len(e.buffer)
 		}
+		return
+	}
+	if key != '~' {
+		return
+	}
+	switch params {
+	case "1":
+		e.cursor = 0
+	case "4":
+		e.cursor = len(e.buffer)
+	case "3":
+		e.deleteForward()
+	case "3;3", "8;3", "127;3": // Alt-Delete and Alt-Backspace
+		e.clearLine()
+	case "3;5": // Ctrl-Delete
+		e.deleteBoundaryForward()
+		e.resetNavigation()
+	case "8;5", "127;5": // Ctrl-Backspace
+		e.deleteBoundaryBackward()
+		e.resetNavigation()
+	}
+}
+
+func (e *Editor) clearLine() {
+	e.buffer = nil
+	e.cursor = 0
+	e.resetNavigation()
+}
+
+func (e *Editor) deleteForward() {
+	if e.cursor < len(e.buffer) {
+		e.buffer = append(e.buffer[:e.cursor], e.buffer[e.cursor+1:]...)
+		e.resetNavigation()
 	}
 }
 
@@ -210,6 +256,33 @@ func (e *Editor) deleteWordBackward() {
 	}
 	e.buffer = append(e.buffer[:start], e.buffer[e.cursor:]...)
 	e.cursor = start
+}
+
+func (e *Editor) deleteBoundaryBackward() {
+	start := e.cursor
+	for start > 0 && isWordBoundary(e.buffer[start-1]) {
+		start--
+	}
+	for start > 0 && !isWordBoundary(e.buffer[start-1]) {
+		start--
+	}
+	e.buffer = append(e.buffer[:start], e.buffer[e.cursor:]...)
+	e.cursor = start
+}
+
+func (e *Editor) deleteBoundaryForward() {
+	end := e.cursor
+	for end < len(e.buffer) && isWordBoundary(e.buffer[end]) {
+		end++
+	}
+	for end < len(e.buffer) && !isWordBoundary(e.buffer[end]) {
+		end++
+	}
+	e.buffer = append(e.buffer[:e.cursor], e.buffer[end:]...)
+}
+
+func isWordBoundary(value rune) bool {
+	return unicode.IsSpace(value) || strings.ContainsRune("/.-", value)
 }
 
 func (e *Editor) previousHistory() {

@@ -8,7 +8,8 @@ It provides:
 
 - persistent, de-duplicated XDG history with prefix navigation and inline suggestions;
 - filesystem completion for relative, absolute, and `~/` paths;
-- readline-style editing: arrows, Home/End, Delete, Ctrl-A/E/U/W/K/L, Ctrl-R, Ctrl-C/D;
+- readline-style editing: arrows, Home/End, Delete, Alt-Backspace/Delete, Ctrl-A/E/U/W/K/L,
+  Ctrl-Backspace/Delete/R, Ctrl-C/D;
 - no shell, daemon, or background indexer.
 
 ## Install
